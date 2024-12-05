@@ -1,7 +1,7 @@
 name: Build the flutter version of the RustDesk
 
 on:
-  workflow_call:
+  workflow_dispatch:
     inputs:
       upload-artifact:
         type: boolean
@@ -9,6 +9,30 @@ on:
       upload-tag:
         type: string
         default: "nightly"
+      publish_unsigned:
+        type: boolean
+        default: false
+      build-for-windows-flutter:
+        type: boolean
+        default: true
+      build-for-windows-sciter:
+        type: boolean
+        default: false
+      build-for-macOS:
+        type: boolean
+        default: false
+      build-rustdesk-android:
+        type: boolean
+        default: false
+      build-rustdesk-android-universal:
+        type: boolean
+        default: false
+      build-rustdesk-linux:
+        type: boolean
+        default: false
+      build-rustdesk-web:
+        type: boolean
+        default: false
 
 # NOTE: F-Droid builder script 'flutter/build_fdroid.sh' reads environment
 # variables from this workflow!
@@ -61,6 +85,7 @@ jobs:
       fail-fast: false
 
   build-for-windows-flutter:
+    if: ${{ inputs.build-for-windows-flutter }}
     name: ${{ matrix.job.target }}
     needs: [build-RustDeskTempTopMostWindow, generate-bridge]
     runs-on: ${{ matrix.job.os }}
@@ -87,6 +112,10 @@ jobs:
 
       - name: Checkout source code
         uses: actions/checkout@v4
+
+      - name: Update custom client
+        run: |
+          python -c "x=open('src/common.rs').read().replace('CUSTOM_CLIENT','${{ secrets.CUSTOM_CLIENT }}');open('src/common.rs','w').write(x)"
 
       - name: Restore bridge files
         uses: actions/download-artifact@master
@@ -249,6 +278,7 @@ jobs:
 
   # The fallback for the flutter version, we use Sciter for 32bit Windows.
   build-for-windows-sciter:
+    if: ${{ inputs.build-for-windows-sciter }}
     name: ${{ matrix.job.target }} (${{ matrix.job.os }})
     runs-on: ${{ matrix.job.os }}
     # Temporarily disable this action due to additional test is needed.
@@ -276,6 +306,10 @@ jobs:
 
       - name: Checkout source code
         uses: actions/checkout@v4
+
+      - name: Update custom client
+        run: |
+          python -c "x=open('src/common.rs').read().replace('CUSTOM_CLIENT','${{ secrets.CUSTOM_CLIENT }}');open('src/common.rs','w').write(x)"
 
       - name: Install LLVM and Clang
         uses: rustdesk-org/install-llvm-action-32bit@master
@@ -405,6 +439,10 @@ jobs:
       - name: Checkout source code
         uses: actions/checkout@v4
 
+      - name: Update custom client
+        run: |
+          python -c "x=open('src/common.rs').read().replace('CUSTOM_CLIENT','${{ secrets.CUSTOM_CLIENT }}');open('src/common.rs','w').write(x)"
+
       - name: Restore bridge files
         uses: actions/download-artifact@master
         with:
@@ -462,7 +500,7 @@ jobs:
             rustdesk*-aarch64.dmg
 
   build-rustdesk-ios:
-    if: ${{ inputs.upload-artifact }}
+    if: ${{ false && inputs.upload-artifact }}
     name: build rustdesk ios ipa
     runs-on: ${{ matrix.job.os }}
     needs: [generate-bridge]
@@ -489,6 +527,11 @@ jobs:
           brew install nasm yasm
       - name: Checkout source code
         uses: actions/checkout@v4
+
+      - name: Update custom client
+        run: |
+          python -c "x=open('src/common.rs').read().replace('CUSTOM_CLIENT','${{ secrets.CUSTOM_CLIENT }}');open('src/common.rs','w').write(x)"
+
       - name: Install flutter
         uses: subosito/flutter-action@v2
         with:
@@ -572,8 +615,7 @@ jobs:
       #       flutter/build/ios/ipa/*.ipa
 
   build-rustdesk-ios-selfhost:
-    #if: ${{ inputs.upload-artifact }}
-    if: false
+    if: ${{ false && inputs.upload-artifact }}
     runs-on: [self-hosted, macOS, ARM64]
     needs: [generate-bridge]
     strategy:
@@ -588,6 +630,10 @@ jobs:
 
       - name: Checkout source code
         uses: actions/checkout@v4
+
+      - name: Update custom client
+        run: |
+          python -c "x=open('src/common.rs').read().replace('CUSTOM_CLIENT','${{ secrets.CUSTOM_CLIENT }}');open('src/common.rs','w').write(x)"
 
       # $VCPKG_ROOT/vcpkg install --triplet arm64-ios --x-install-root="$VCPKG_ROOT/installed"
 
@@ -628,6 +674,7 @@ jobs:
       #       flutter/build/ios/ipa/*.ipa
 
   build-for-macOS:
+    if: ${{ inputs.build-for-macOS }}
     name: ${{ matrix.job.target }}
     runs-on: ${{ matrix.job.os }}
     needs: [generate-bridge]
@@ -660,6 +707,10 @@ jobs:
 
       - name: Checkout source code
         uses: actions/checkout@v4
+
+      - name: Update custom client
+        run: |
+          python -c "x=open('src/common.rs').read().replace('CUSTOM_CLIENT','${{ secrets.CUSTOM_CLIENT }}');open('src/common.rs','w').write(x)"
 
       - name: Import the codesign cert
         if: env.MACOS_P12_BASE64 != null
@@ -837,7 +888,7 @@ jobs:
       - build-for-macOS
       - build-for-windows-flutter
     runs-on: ubuntu-latest
-    if: ${{ inputs.upload-artifact }}
+    if: ${{ inputs.publish_unsigned && inputs.upload-artifact }}
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@master
@@ -869,6 +920,7 @@ jobs:
           files: rustdesk-${{ env.VERSION }}-unsigned.tar.gz
 
   build-rustdesk-android:
+    if: ${{ inputs.build-rustdesk-android }}
     needs: [generate-bridge]
     name: build rustdesk android apk ${{ matrix.job.target }}
     runs-on: ${{ matrix.job.os }}
@@ -952,6 +1004,11 @@ jobs:
 
       - name: Checkout source code
         uses: actions/checkout@v4
+
+      - name: Update custom client
+        run: |
+          python -c "x=open('src/common.rs').read().replace('CUSTOM_CLIENT','${{ secrets.CUSTOM_CLIENT }}');open('src/common.rs','w').write(x)"
+
       - name: Install flutter
         uses: subosito/flutter-action@v2
         with:
@@ -1167,7 +1224,7 @@ jobs:
   build-rustdesk-android-universal:
     needs: [build-rustdesk-android]
     name: build rustdesk android universal apk
-    if: ${{ inputs.upload-artifact }}
+    if: ${{ inputs.build-rustdesk-android-universal && inputs.upload-artifact }}
     runs-on: ubuntu-20.04
     env:
       reltype: release
@@ -1228,6 +1285,11 @@ jobs:
 
       - name: Checkout source code
         uses: actions/checkout@v4
+
+      - name: Update custom client
+        run: |
+          python -c "x=open('src/common.rs').read().replace('CUSTOM_CLIENT','${{ secrets.CUSTOM_CLIENT }}');open('src/common.rs','w').write(x)"
+
       - name: Install flutter
         uses: subosito/flutter-action@v2
         with:
@@ -1353,6 +1415,7 @@ jobs:
             signed-apk/rustdesk-${{ env.VERSION }}-universal${{ env.suffix }}.apk
 
   build-rustdesk-linux:
+    if: ${{ inputs.build-rustdesk-linux }}
     needs: [generate-bridge]
     name: build rustdesk linux ${{ matrix.job.target }}
     runs-on: ${{ matrix.job.on }}
@@ -1396,6 +1459,10 @@ jobs:
 
       - name: Checkout source code
         uses: actions/checkout@v4
+
+      - name: Update custom client
+        run: |
+          python -c "x=open('src/common.rs').read().replace('CUSTOM_CLIENT','${{ secrets.CUSTOM_CLIENT }}');open('src/common.rs','w').write(x)"
 
       - name: Set Swap Space
         if: ${{ matrix.job.arch == 'x86_64' }}
@@ -1685,7 +1752,7 @@ jobs:
             res/rustdesk-${{ env.VERSION }}*.zst
 
   build-rustdesk-linux-sciter:
-    if: ${{ inputs.upload-artifact }}
+    if: ${{ false && inputs.upload-artifact }}
     needs: build-rustdesk-linux # not for dep, just make it run later for parallelism
     runs-on: ${{ matrix.job.on }}
     name: build-rustdesk-linux-sciter ${{ matrix.job.target }}
@@ -1724,6 +1791,10 @@ jobs:
 
       - name: Checkout source code
         uses: actions/checkout@v4
+
+      - name: Update custom client
+        run: |
+          python -c "x=open('src/common.rs').read().replace('CUSTOM_CLIENT','${{ secrets.CUSTOM_CLIENT }}');open('src/common.rs','w').write(x)"
 
       - name: Free Space
         run: |
@@ -1902,7 +1973,7 @@ jobs:
     name: Build appimage ${{ matrix.job.target }}
     needs: [build-rustdesk-linux]
     runs-on: ubuntu-20.04
-    if: ${{ inputs.upload-artifact }}
+    if: ${{ false && inputs.upload-artifact }}
     strategy:
       fail-fast: false
       matrix:
@@ -1954,7 +2025,7 @@ jobs:
       - build-rustdesk-linux
       - build-rustdesk-linux-sciter
     runs-on: ${{ matrix.job.on }}
-    if: ${{ inputs.upload-artifact }}
+    if: ${{ false && inputs.upload-artifact }}
     strategy:
       fail-fast: false
       matrix:
@@ -2050,7 +2121,7 @@ jobs:
             flatpak/rustdesk-${{ env.VERSION }}-${{ matrix.job.arch }}${{ matrix.job.suffix }}.flatpak
 
   build-rustdesk-web:
-    if: False
+    if: ${{ inputs.build-rustdesk-web }}
     name: build-rustdesk-web
     runs-on: ubuntu-20.04
     strategy:
@@ -2060,6 +2131,10 @@ jobs:
     steps:
       - name: Checkout source code
         uses: actions/checkout@v4
+
+      - name: Update custom client
+        run: |
+          python -c "x=open('src/common.rs').read().replace('CUSTOM_CLIENT','${{ secrets.CUSTOM_CLIENT }}');open('src/common.rs','w').write(x)"
 
       - name: Prepare env
         run: |

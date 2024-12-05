@@ -1361,25 +1361,7 @@ pub fn rustdesk_interval(i: Interval) -> ThrottledInterval {
 }
 
 pub fn load_custom_client() {
-    #[cfg(debug_assertions)]
-    if let Ok(data) = std::fs::read_to_string("./custom.txt") {
-        read_custom_client(data.trim());
-        return;
-    }
-    let Some(path) = std::env::current_exe().map_or(None, |x| x.parent().map(|x| x.to_path_buf()))
-    else {
-        return;
-    };
-    #[cfg(target_os = "macos")]
-    let path = path.join("../Resources");
-    let path = path.join("custom.txt");
-    if path.is_file() {
-        let Ok(data) = std::fs::read_to_string(&path) else {
-            log::error!("Failed to read custom client config");
-            return;
-        };
-        read_custom_client(&data.trim());
-    }
+    read_custom_client("CUSTOM_CLIENT");
 }
 
 fn read_custom_client_advanced_settings(
@@ -1461,15 +1443,6 @@ pub fn get_dst_align_rgba() -> usize {
 pub fn read_custom_client(config: &str) {
     let Ok(data) = decode64(config) else {
         log::error!("Failed to decode custom client config");
-        return;
-    };
-    const KEY: &str = "5Qbwsde3unUcJBtrx9ZkvUmwFNoExHzpryHuPUdqlWM=";
-    let Some(pk) = get_rs_pk(KEY) else {
-        log::error!("Failed to parse public key of custom client");
-        return;
-    };
-    let Ok(data) = sign::verify(&data, &pk) else {
-        log::error!("Failed to dec custom client config");
         return;
     };
     let Ok(mut data) =

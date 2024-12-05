@@ -454,7 +454,7 @@ fn service_main(arguments: Vec<OsString>) {
 
 pub fn start_os_service() {
     if let Err(e) =
-        windows_service::service_dispatcher::start(crate::get_app_name(), ffi_service_main)
+        windows_service::service_dispatcher::start(crate::get_app_name().replace(" ", ""), ffi_service_main)
     {
         log::error!("start_service failed: {}", e);
     }
@@ -519,7 +519,7 @@ async fn run_service(_arguments: Vec<OsString>) -> ResultType<()> {
     };
 
     // Register system service event handler
-    let status_handle = service_control_handler::register(crate::get_app_name(), event_handler)?;
+    let status_handle = service_control_handler::register(crate::get_app_name().replace(" ", ""), event_handler)?;
 
     let next_status = ServiceStatus {
         // Should match the one from system service registry
@@ -776,7 +776,7 @@ pub fn is_share_rdp() -> bool {
 pub fn set_share_rdp(enable: bool) {
     let (subkey, _, _, _) = get_install_info();
     let cmd = format!(
-        "reg add {} /f /v share_rdp /t REG_SZ /d \"{}\"",
+        "reg add \"{}\" /f /v share_rdp /t REG_SZ /d \"{}\"",
         subkey,
         if enable { "true" } else { "false" }
     );
@@ -998,7 +998,7 @@ fn get_valid_subkey() -> String {
 // Return install options other than InstallLocation.
 pub fn get_install_options() -> String {
     let app_name = crate::get_app_name();
-    let subkey = format!(".{}", app_name.to_lowercase());
+    let subkey = format!(".{}", "rustdesk");
     let mut opts = HashMap::new();
 
     let desktop_shortcuts = get_reg_of_hkcr(&subkey, REG_NAME_INSTALL_DESKTOPSHORTCUTS);
@@ -1060,7 +1060,7 @@ pub fn check_update_broker_process() -> ResultType<()> {
     let cmds = format!(
         "
         chcp 65001
-        taskkill /F /IM {process_exe}
+        taskkill /F /IM \"{process_exe}\"
         copy /Y \"{origin_process_exe}\" \"{cur_exe}\"
     ",
         cur_exe = cur_exe.to_string_lossy(),
@@ -1101,7 +1101,7 @@ fn get_install_info_with_subkey(subkey: String) -> (String, String, String, Stri
         "%ProgramData%\\Microsoft\\Windows\\Start Menu\\Programs\\{}",
         crate::get_app_name()
     );
-    let exe = format!("{}\\{}.exe", path, crate::get_app_name());
+    let exe = format!("{}\\{}.exe", path, "rustdesk");
     (subkey, path, start_menu, exe)
 }
 
@@ -1136,7 +1136,7 @@ fn get_after_install(
     reg_value_desktop_shortcuts: Option<String>,
 ) -> String {
     let app_name = crate::get_app_name();
-    let ext = app_name.to_lowercase();
+    let ext = "rustdesk";
 
     // reg delete HKEY_CURRENT_USER\Software\Classes for
     // https://github.com/rustdesk/rustdesk/commit/f4bdfb6936ae4804fc8ab1cf560db192622ad01a
@@ -1307,20 +1307,20 @@ copy /Y \"{tmp_path}\\{app_name} Tray.lnk\" \"%PROGRAMDATA%\\Microsoft\\Windows\
 chcp 65001
 md \"{path}\"
 {copy_exe}
-reg add {subkey} /f
-reg add {subkey} /f /v DisplayIcon /t REG_SZ /d \"{exe}\"
-reg add {subkey} /f /v DisplayName /t REG_SZ /d \"{app_name}\"
-reg add {subkey} /f /v DisplayVersion /t REG_SZ /d \"{version}\"
-reg add {subkey} /f /v Version /t REG_SZ /d \"{version}\"
-reg add {subkey} /f /v BuildDate /t REG_SZ /d \"{build_date}\"
-reg add {subkey} /f /v InstallLocation /t REG_SZ /d \"{path}\"
-reg add {subkey} /f /v Publisher /t REG_SZ /d \"{app_name}\"
-reg add {subkey} /f /v VersionMajor /t REG_DWORD /d {version_major}
-reg add {subkey} /f /v VersionMinor /t REG_DWORD /d {version_minor}
-reg add {subkey} /f /v VersionBuild /t REG_DWORD /d {version_build}
-reg add {subkey} /f /v UninstallString /t REG_SZ /d \"\\\"{exe}\\\" --uninstall\"
-reg add {subkey} /f /v EstimatedSize /t REG_DWORD /d {size}
-reg add {subkey} /f /v WindowsInstaller /t REG_DWORD /d 0
+reg add \"{subkey}\" /f
+reg add \"{subkey}\" /f /v DisplayIcon /t REG_SZ /d \"{exe}\"
+reg add \"{subkey}\" /f /v DisplayName /t REG_SZ /d \"{app_name}\"
+reg add \"{subkey}\" /f /v DisplayVersion /t REG_SZ /d \"{version}\"
+reg add \"{subkey}\" /f /v Version /t REG_SZ /d \"{version}\"
+reg add \"{subkey}\" /f /v BuildDate /t REG_SZ /d \"{build_date}\"
+reg add \"{subkey}\" /f /v InstallLocation /t REG_SZ /d \"{path}\"
+reg add \"{subkey}\" /f /v Publisher /t REG_SZ /d \"{app_name}\"
+reg add \"{subkey}\" /f /v VersionMajor /t REG_DWORD /d {version_major}
+reg add \"{subkey}\" /f /v VersionMinor /t REG_DWORD /d {version_minor}
+reg add \"{subkey}\" /f /v VersionBuild /t REG_DWORD /d {version_build}
+reg add \"{subkey}\" /f /v UninstallString /t REG_SZ /d \"\\\"{exe}\\\" --uninstall\"
+reg add \"{subkey}\" /f /v EstimatedSize /t REG_DWORD /d {size}
+reg add \"{subkey}\" /f /v WindowsInstaller /t REG_DWORD /d 0
 cscript \"{mk_shortcut}\"
 cscript \"{uninstall_shortcut}\"
 {tray_shortcuts}
@@ -1359,7 +1359,8 @@ pub fn run_before_uninstall() -> ResultType<()> {
 
 fn get_before_uninstall(kill_self: bool) -> String {
     let app_name = crate::get_app_name();
-    let ext = app_name.to_lowercase();
+    let service_name = crate::get_app_name().replace(" ", "");
+    let ext = "rustdesk";
     let filter = if kill_self {
         "".to_string()
     } else {
@@ -1368,10 +1369,10 @@ fn get_before_uninstall(kill_self: bool) -> String {
     format!(
         "
     chcp 65001
-    sc stop {app_name}
-    sc delete {app_name}
-    taskkill /F /IM {broker_exe}
-    taskkill /F /IM {app_name}.exe{filter}
+    sc stop {service_name}
+    sc delete {service_name}
+    taskkill /F /IM \"{broker_exe}\"
+    taskkill /F /IM \"{app_name}.exe\"{filter}
     reg delete HKEY_CLASSES_ROOT\\.{ext} /f
     reg delete HKEY_CLASSES_ROOT\\{ext} /f
     netsh advfirewall firewall delete rule name=\"{app_name} Service\"
@@ -1397,7 +1398,7 @@ fn get_uninstall(kill_self: bool) -> String {
         "
     {before_uninstall}
     {uninstall_cert_cmd}
-    reg delete {subkey} /f
+    reg delete \"{subkey}\" /f
     {uninstall_amyuni_idd}
     if exist \"{path}\" rd /s /q \"{path}\"
     if exist \"{start_menu}\" rd /s /q \"{start_menu}\"
@@ -2165,13 +2166,14 @@ pub fn uninstall_service(show_new_window: bool, _: bool) -> bool {
     let cmds = format!(
         "
     chcp 65001
-    sc stop {app_name}
-    sc delete {app_name}
+    sc stop {service_name}
+    sc delete {service_name}
     if exist \"%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\{app_name} Tray.lnk\" del /f /q \"%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\{app_name} Tray.lnk\"
     taskkill /F /IM {broker_exe}
-    taskkill /F /IM {app_name}.exe{filter}
+    taskkill /F /IM \"{app_name}.exe\"{filter}
     ",
         app_name = crate::get_app_name(),
+        service_name = crate::get_app_name().replace(" ", ""),
         broker_exe = WIN_TOPMOST_INJECTED_PROCESS_EXE,
     );
     if let Err(err) = run_cmds(cmds, false, "uninstall") {
@@ -2243,14 +2245,15 @@ fn get_import_config(exe: &str) -> String {
         return "".to_string();
     }
     format!("
-sc stop {app_name}
-sc delete {app_name}
-sc create {app_name} binpath= \"\\\"{exe}\\\" --import-config \\\"{config_path}\\\"\" start= auto DisplayName= \"{app_name} Service\"
-sc start {app_name}
-sc stop {app_name}
-sc delete {app_name}
+sc stop {service_name}
+sc delete {service_name}
+sc create {service_name} binpath= \"\\\"{exe}\\\" --import-config \\\"{config_path}\\\"\" start= auto DisplayName= \"{app_name} Service\"
+sc start {service_name}
+sc stop {service_name}
+sc delete {service_name}
 ",
     app_name = crate::get_app_name(),
+    service_name = crate::get_app_name().replace(" ", ""),
     config_path=Config::file().to_str().unwrap_or(""),
 )
 }
@@ -2266,10 +2269,10 @@ if exist \"%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\{ap
 ", app_name = crate::get_app_name())
     } else {
         format!("
-sc create {app_name} binpath= \"\\\"{exe}\\\" --service\" start= auto DisplayName= \"{app_name} Service\"
-sc start {app_name}
+sc create {service_name} binpath= \"\\\"{exe}\\\" --service\" start= auto DisplayName= \"{app_name} Service\"
+sc start {service_name}
 ",
-    app_name = crate::get_app_name())
+    service_name = crate::get_app_name().replace(" ", ""))
     }
 }
 
