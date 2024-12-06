@@ -1368,6 +1368,26 @@ pub fn uninstall_service(show_new_window: bool, _: bool) -> bool {
     std::process::exit(0);
 }
 
+pub fn stop_service(show_new_window: bool, _: bool) -> bool {
+    if !has_cmd("systemctl") {
+        // Failed when installed + flutter run + started by `show_new_window`.
+        return false;
+    }
+    log::info!("Stopping service...");
+    let app_name = crate::get_app_name().to_lowercase();
+    // systemctl kill rustdesk --tray, execute cp first
+    if !run_cmds_privileged(&format!(
+        "systemctl stop {app_name};"
+    )) {
+        return true;
+    }
+    // systemctl stop will kill child processes, below may not be executed.
+    if show_new_window {
+        run_me_with(2);
+    }
+    std::process::exit(0);
+}
+
 pub fn install_service() -> bool {
     let _installing = crate::platform::InstallingService::new();
     if !has_cmd("systemctl") {

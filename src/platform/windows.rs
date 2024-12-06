@@ -1400,6 +1400,7 @@ fn get_uninstall(kill_self: bool) -> String {
     {uninstall_cert_cmd}
     reg delete \"{subkey}\" /f
     {uninstall_amyuni_idd}
+    timeout /t 2
     if exist \"{path}\" rd /s /q \"{path}\"
     if exist \"{start_menu}\" rd /s /q \"{start_menu}\"
     if exist \"%PUBLIC%\\Desktop\\{app_name}.lnk\" del /f /q \"%PUBLIC%\\Desktop\\{app_name}.lnk\"
@@ -1484,11 +1485,11 @@ fn run_cmds(cmds: String, show: bool, tip: &str) -> ResultType<()> {
         .force_prompt(true)
         .status();
     if !show {
-        allow_err!(std::fs::remove_file(tmp));
+        // allow_err!(std::fs::remove_file(tmp));
     }
     let _ = res?;
     if tmp2.exists() {
-        allow_err!(std::fs::remove_file(tmp2));
+        // allow_err!(std::fs::remove_file(tmp2));
         bail!("{} failed", tip);
     }
     Ok(())
@@ -2169,7 +2170,7 @@ pub fn uninstall_service(show_new_window: bool, _: bool) -> bool {
     sc stop {service_name}
     sc delete {service_name}
     if exist \"%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\{app_name} Tray.lnk\" del /f /q \"%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\{app_name} Tray.lnk\"
-    taskkill /F /IM {broker_exe}
+    taskkill /F /IM \"{broker_exe}\"
     taskkill /F /IM \"{app_name}.exe\"{filter}
     ",
         app_name = crate::get_app_name(),
@@ -2178,6 +2179,28 @@ pub fn uninstall_service(show_new_window: bool, _: bool) -> bool {
     );
     if let Err(err) = run_cmds(cmds, false, "uninstall") {
         Config::set_option("stop-service".into(), "".into());
+        log::debug!("{err}");
+        return true;
+    }
+    run_after_run_cmds(!show_new_window);
+    std::process::exit(0);
+}
+
+pub fn stop_service(show_new_window: bool, _: bool) -> bool {
+    log::info!("Stopping service...");
+    let filter = format!(" /FI \"PID ne {}\"", get_current_pid());
+    let cmds = format!(
+        "
+    chcp 65001
+    sc stop {service_name}
+    taskkill /F /IM \"{broker_exe}\"
+    taskkill /F /IM \"{app_name}.exe\"{filter}
+    ",
+        app_name = crate::get_app_name(),
+        service_name = crate::get_app_name().replace(" ", ""),
+        broker_exe = WIN_TOPMOST_INJECTED_PROCESS_EXE,
+    );
+    if let Err(err) = run_cmds(cmds, false, "stop") {
         log::debug!("{err}");
         return true;
     }
@@ -2197,7 +2220,7 @@ pub fn install_service() -> bool {
     let cmds = format!(
         "
 chcp 65001
-taskkill /F /IM {app_name}.exe{filter}
+taskkill /F /IM \"{app_name}.exe\"{filter}
 cscript \"{tray_shortcut}\"
 copy /Y \"{tmp_path}\\{app_name} Tray.lnk\" \"%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\\"
 {import_config}
@@ -2272,6 +2295,7 @@ if exist \"%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\{ap
 sc create {service_name} binpath= \"\\\"{exe}\\\" --service\" start= auto DisplayName= \"{app_name} Service\"
 sc start {service_name}
 ",
+    app_name = crate::get_app_name(),
     service_name = crate::get_app_name().replace(" ", ""))
     }
 }
